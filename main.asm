@@ -288,6 +288,7 @@ Main:
   ; Desenha na matriz LED
   rcall Atraso
   ; Verifica se o jogo está finalizado
+  ; TODO: Fazer funcionar ????
   cp screen_up, screen_down
   brne Main          ; se forem diferentes, continua
   cpi screen_up, 0x00
@@ -350,6 +351,7 @@ Desenhar:
   ret
 
 
+; Animacao para indicar o fim e volta para o comeco (apertar botao)
 Finalizar:
   ; Z aponta para tabela espiral
   ldi ZH, high(EspiralTable*2)

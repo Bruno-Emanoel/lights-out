@@ -2,6 +2,7 @@
 .include "m328Pdef.inc"
 .list
 
+.def aux_timer = R15
 .def aux = R16
 .def screen_up = R17
 .def screen_down = R18
@@ -51,13 +52,69 @@ INICIO:
     cpi aux, 0x00       
     breq Aguardar_Botao
 
-  ; Botão pressionado -> capturar valores dos timers
-  in screen_up, TCNT0
-  lds screen_down, TCNT1L
+  rcall Gerar_Padrao_Possivel
 
   ; Ligando o flag de interrupção
   sei
   rjmp  Main
+
+
+; Gera um padrão sempre resolvível usando os valores dos timers
+; Modifica screen_up e screen_down diretamente
+Gerar_Padrao_Possivel:
+  clr screen_up
+  clr screen_down
+
+  ; Toque aleatório 1
+  in aux, TCNT0         ; valor aleatório (0 a 255)
+  andi aux, 0x0F        ; limita de 0 a 15
+  mov count, aux
+  rcall SimularToque
+
+  ; Toque aleatório 2
+  lds aux, TCNT1L
+  andi aux, 0x0F
+  mov count, aux
+  rcall SimularToque
+
+  ; Toque aleatório 3
+  in aux, TCNT0
+  lds aux_timer, TCNT1L
+  add aux, aux_timer       ; soma dois valores "randômicos"
+  andi aux, 0x0F
+  mov count, aux
+  rcall SimularToque
+
+  ; Toque aleatório 4
+  in aux, TCNT0
+  lds aux_timer, TCNT1L
+  eor aux, aux_timer       ; mistura os bits com XOR
+  andi aux, 0x0F
+  mov count, aux
+  rcall SimularToque
+
+  ; Toque aleatório 5
+  lds aux, TCNT1L
+  com aux               ; inverte os bits
+  andi aux, 0x0F
+  mov count, aux
+  rcall SimularToque
+
+  ret
+
+; Sub-rotina que simula apertar um botão com índice em 'count'
+SimularToque:
+  mov R26, count        ; compatível com Acender_Up/Down
+  cpi count, 8
+  brge Simular_Down
+  rcall Acender_Up
+  ret
+
+Simular_Down:
+  subi count, 8
+  rcall Acender_Down
+  ret
+
 
 BOTAO_APERTADO:
   ; Quando o botão é apertado, ele muda arbitrariamente os valores em screen_up e screen_down
@@ -228,8 +285,15 @@ Acender_Down:
   ret
 
 Main:
+  ; Desenha na matriz LED
   rcall Atraso
-  rjmp  Main
+  ; Verifica se o jogo está finalizado
+  cp screen_up, screen_down
+  brne Main          ; se forem diferentes, continua
+  cpi screen_up, 0x00
+  brne Main          ; se não for zero, continua
+  rjmp Finalizar
+
 
 ;Método que olhará os valores em screne_up e screen_down e os desenhará na matriz de led
 Desenhar:
@@ -286,6 +350,71 @@ Desenhar:
   ret
 
 
+Finalizar:
+  ; Z aponta para tabela espiral
+  ldi ZH, high(EspiralTable*2)
+  ldi ZL, low(EspiralTable*2)
+  ldi count, 16
+
+Espiral_Loop:
+  lpm aux, Z+         ; aux = posição 0 a 15
+
+  ; Ativa o bit correspondente
+  cpi aux, 8
+  brlt Finalizar_Set_Up
+
+  ; screen_down
+  subi aux, 8
+  ldi aux_bit, 1
+  Finalizar_Loop1:
+    cpi aux, 0
+    breq Finalizar_Grava_Down
+    dec aux
+    lsl aux_bit
+    rjmp Finalizar_Loop1
+
+  Finalizar_Grava_Down:
+    or screen_down, aux_bit
+    rjmp Finalizar_Desenha
+
+Finalizar_Set_Up:
+  ldi aux_bit, 1
+  Finalizar_Loop2:
+    cpi aux, 0
+    breq Finalizar_Grava_Up
+    dec aux
+    lsl aux_bit
+    rjmp Finalizar_Loop2
+
+  Finalizar_Grava_Up:
+    or screen_up, aux_bit
+
+Finalizar_Desenha:
+  rcall Desenhar
+  rcall Atraso
+
+  dec count
+  brne Espiral_Loop
+
+; Piscar todos os LEDs 3 vezes
+  ldi count, 3
+Finalizar_Piscar:
+  ldi screen_up, 0xFF
+  ldi screen_down, 0xFF
+  rcall Desenhar
+  rcall Atraso
+
+  clr screen_up
+  clr screen_down
+  rcall Desenhar
+  rcall Atraso
+
+  dec count
+  brne Finalizar_Piscar
+
+  rjmp Aguardar_Botao
+
+
 Atraso:
   ldi   r20, 0xff
   Volta1:
@@ -304,3 +433,10 @@ Atraso_Pequeno:
   dec   r21
   brne  Volta_Pequena
   ret
+
+
+EspiralTable:
+  .db 0, 1, 2, 3
+  .db 7, 11, 15, 14
+  .db 13, 12, 8, 4
+  .db 5, 6, 10, 9

@@ -33,18 +33,31 @@ INICIO:
   ; Habilitando PCI para o portB (PCIE0)
   ldi   aux, (1<<PCIE0)
   sts   PCICR, aux
-  ; Ligando o flag de interrupção
-  sei
-
-  ; Valor inicial da tela
+  
   ; Como será utilizada uma matriz de led como se fosse 4X4, precisaremos de 16 bits no total.
   ; Ou seja, 2 registradores que serão chamados de screen_up e screen_down, que portarão a parte superior e inferior da tela, respectivamente.
   ; Os 4 bits menos significativos de cada um representam sua linha superior, enquanto os 4 mais significativos representam a linha inferior. 
-  ; TODO: Mudar essa inicialização
-  ldi   screen_up, 0xff
-  ldi   screen_down, 0xff
-  rjmp  Main
 
+  ; Inicializar os Timers
+  ldi aux, (1<<CS01) | (1<<CS00)   ; Timer0 com prescaler 64
+  out TCCR0B, aux
+
+  ldi aux, (1<<CS11) | (1<<CS10)   ; Timer1 com prescaler 64
+  sts TCCR1B, aux
+
+  ; Aguardar botão ser pressionado
+  Aguardar_Botao:
+    in aux, PINB         
+    cpi aux, 0x00       
+    breq Aguardar_Botao
+
+  ; Botão pressionado -> capturar valores dos timers
+  in screen_up, TCNT0
+  lds screen_down, TCNT1L
+
+  ; Ligando o flag de interrupção
+  sei
+  rjmp  Main
 
 BOTAO_APERTADO:
   ; Quando o botão é apertado, ele muda arbitrariamente os valores em screen_up e screen_down
@@ -71,7 +84,7 @@ BOTAO_APERTADO:
   and   aux, col_pointer
   cpi   aux, 0
   breq  BOTAO_APERTADO_Checar_ProximaColuna
-  rjmp  BOTAO_APERTADO_Ascender
+  rjmp  BOTAO_APERTADO_Acender
   BOTAO_APERTADO_Checar_ProximaColuna:
   inc   count
   lsl   col_pointer
@@ -82,34 +95,34 @@ BOTAO_APERTADO:
 
   cpi   count, 16
   brge  BOTAO_APERTADO_Retorno
-  BOTAO_APERTADO_Ascender:
+  BOTAO_APERTADO_Acender:
   mov   R26, count
   cpi   count, 8
   brge  BOTAO_APERTADO_Down
-  rcall Ascender_Up
+  rcall Acender_Up
   rjmp  BOTAO_APERTADO_Retorno
   BOTAO_APERTADO_Down:
   subi  count, 8
-  rcall Ascender_Down
+  rcall Acender_Down
   BOTAO_APERTADO_Retorno:
   RETI
 
-Ascender_Up:
+Acender_Up:
   clr   aux
   clr   aux_bit
   inc   aux_bit
 
-  Ascender_Up_Centro:
+  Acender_Up_Centro:
   cp    aux, count
-  breq  Ascender_Up_Cima
+  breq  Acender_Up_Cima
   inc   aux
   lsl   aux_bit
-  rjmp  Ascender_Up_Centro
-  Ascender_Up_Cima:
+  rjmp  Acender_Up_Centro
+  Acender_Up_Cima:
   eor   screen_up, aux_bit
 
   cpi   aux, 4
-  brlt  Ascender_Up_Direita
+  brlt  Acender_Up_Direita
   mov   bit_copy, aux_bit
   lsr   bit_copy  
   lsr   bit_copy  
@@ -117,26 +130,26 @@ Ascender_Up:
   lsr   bit_copy
   eor   screen_up, bit_copy  
 
-  Ascender_Up_Direita:
+  Acender_Up_Direita:
   andi  aux, 0b11
   cpi   aux, 0
-  breq  Ascender_Up_Baixo
+  breq  Acender_Up_Baixo
   mov   bit_copy, aux_bit
   lsr   bit_copy
   eor   screen_up, bit_copy
 
-  Ascender_Up_Baixo:
+  Acender_Up_Baixo:
   mov   aux, count
   cpi   aux, 0b100
-  brge  Ascender_Up_Baixo_Down
+  brge  Acender_Up_Baixo_Down
   mov   bit_copy, aux_bit
   lsl   bit_copy
   lsl   bit_copy
   lsl   bit_copy
   lsl   bit_copy
   eor   screen_up, bit_copy
-  rjmp  Ascender_Up_Esquerda
-  Ascender_Up_Baixo_Down:
+  rjmp  Acender_Up_Esquerda
+  Acender_Up_Baixo_Down:
   mov   bit_copy, aux_bit
   lsr   bit_copy  
   lsr   bit_copy  
@@ -144,40 +157,40 @@ Ascender_Up:
   lsr   bit_copy
   eor   screen_down, bit_copy 
 
-  Ascender_Up_Esquerda:
+  Acender_Up_Esquerda:
   andi  aux, 0b11
   cpi   aux, 0b11
-  breq  Ascender_Up_Fim
+  breq  Acender_Up_Fim
   lsl   aux_bit
   eor   screen_up, aux_bit
 
-  Ascender_Up_Fim:
+  Acender_Up_Fim:
   ret
 
-Ascender_Down:
+Acender_Down:
   clr   aux
   clr   aux_bit
   inc   aux_bit
   
-  Ascender_Down_Centro:
+  Acender_Down_Centro:
   cp    aux, count
-  breq  Ascender_Down_Cima
+  breq  Acender_Down_Cima
   inc   aux
   lsl   aux_bit
-  rjmp  Ascender_Down_Centro
-  Ascender_Down_Cima:
+  rjmp  Acender_Down_Centro
+  Acender_Down_Cima:
   eor   screen_down, aux_bit
 
   cpi   aux, 4
-  brlt  Ascender_Down_Cima_Up
+  brlt  Acender_Down_Cima_Up
   mov   bit_copy, aux_bit
   lsr   bit_copy  
   lsr   bit_copy  
   lsr   bit_copy  
   lsr   bit_copy
   eor   screen_down, bit_copy  
-  rjmp  Ascender_Down_Direita
-  Ascender_Down_Cima_Up:
+  rjmp  Acender_Down_Direita
+  Acender_Down_Cima_Up:
   mov   bit_copy, aux_bit
   lsl   bit_copy  
   lsl   bit_copy  
@@ -185,18 +198,18 @@ Ascender_Down:
   lsl   bit_copy
   eor   screen_up, bit_copy
 
-  Ascender_Down_Direita:
+  Acender_Down_Direita:
   andi  aux, 0b11
   cpi   aux, 0
-  breq  Ascender_Down_Baixo
+  breq  Acender_Down_Baixo
   mov   bit_copy, aux_bit
   lsr   bit_copy
   eor   screen_down, bit_copy
 
-  Ascender_Down_Baixo:
+  Acender_Down_Baixo:
   mov   aux, count
   cpi   aux, 0b100
-  brge  Ascender_Down_Esquerda
+  brge  Acender_Down_Esquerda
   mov   bit_copy, aux_bit
   lsl   bit_copy
   lsl   bit_copy
@@ -204,14 +217,14 @@ Ascender_Down:
   lsl   bit_copy
   eor   screen_down, bit_copy
 
-  Ascender_Down_Esquerda:
+  Acender_Down_Esquerda:
   andi  aux, 0b11
   cpi   aux, 0b11
-  breq  Ascender_Down_Fim
+  breq  Acender_Down_Fim
   lsl   aux_bit
   eor   screen_down, aux_bit
 
-  Ascender_Down_Fim:
+  Acender_Down_Fim:
   ret
 
 Main:
@@ -227,7 +240,7 @@ Desenhar:
   lsl   aux
   lsl   aux
   lsl   aux
-  ; Precisamos negar o valor, pois os valores colocados em cada coluna ascendem apenas se forem zero.
+  ; Precisamos negar o valor, pois os valores colocados em cada coluna acendem apenas se forem zero.
   com   aux
   ; Precisamos deixar acesos apenas os bits acesos anteriormente da parte mais significativa, e o bit de linha adequado (primeiro)
   andi  aux, 0b11110001
@@ -237,7 +250,7 @@ Desenhar:
   ; Pegar a segunda linha, 4 bits mais significativos de screen_up
   ; Para isso, apenas pegamos o valor de screen_up, não é necessário fazer bit shifting pois os quatro bits já estão na posição adequada
   mov   aux, screen_up
-  ; Precisamos negar o valor, pois os valores colocados em cada coluna ascendem apenas se forem zero.
+  ; Precisamos negar o valor, pois os valores colocados em cada coluna acendem apenas se forem zero.
   andi  aux, 0b11110000
   com   aux
   ; Precisamos deixar acesos apenas os bits acesos anteriormente da parte mais significativa, e o bit de linha adequado (segundo)
@@ -252,7 +265,7 @@ Desenhar:
   lsl   aux
   lsl   aux
   lsl   aux
-  ; Precisamos negar o valor, pois os valores colocados em cada coluna ascendem apenas se forem zero.
+  ; Precisamos negar o valor, pois os valores colocados em cada coluna acendem apenas se forem zero.
   com   aux
   ; Precisamos deixar acesos apenas os bits acesos anteriormente da parte mais significativa, e o bit de linha adequado (terceiro)
   andi  aux, 0b11110100
@@ -262,7 +275,7 @@ Desenhar:
   ; Pegar a quarta linha, 4 bits mais significativos de screen_down
   ; Para isso, apenas pegamos o valor de screen_down, não é necessário fazer bit shifting pois os quatro bits já estão na posição adequada
   mov   aux, screen_down
-  ; Precisamos negar o valor, pois os valores colocados em cada coluna ascendem apenas se forem zero.
+  ; Precisamos negar o valor, pois os valores colocados em cada coluna acendem apenas se forem zero.
   andi  aux, 0b11110000
   com   aux
   ; Precisamos deixar acesos apenas os bits acesos anteriormente da parte mais significativa, e o bit de linha adequado (quarto)

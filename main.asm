@@ -34,6 +34,11 @@ INICIO:
   ; Habilitando PCI para o portB (PCIE0)
   ldi   aux, (1<<PCIE0)
   sts   PCICR, aux
+
+
+  ;ldi   aux, 0xff
+  ;out   DDRC, aux
+
   
   ; Como será utilizada uma matriz de led como se fosse 4X4, precisaremos de 16 bits no total.
   ; Ou seja, 2 registradores que serão chamados de screen_up e screen_down, que portarão a parte superior e inferior da tela, respectivamente.
@@ -284,20 +289,33 @@ Acender_Down:
   Acender_Down_Fim:
   ret
 
+
 Main:
   ; Desenha na matriz LED
-  rcall Atraso
+  ;rcall Atraso
   ; Verifica se o jogo está finalizado
   ; TODO: Fazer funcionar ????
+  ;cpi screen_up, 0
+  ;brne Main          ; se forem diferentes, continua
+  ;cpi screen_down, 0
+  ;brne Main          ; se não for zero, continua
+  ;rjmp Finalizar
+  
+  rcall Desenhar
+  rcall Atraso_Pequeno
   cp screen_up, screen_down
-  brne Main          ; se forem diferentes, continua
+  brne Main
   cpi screen_up, 0x00
-  brne Main          ; se não for zero, continua
+  brne Main
   rjmp Finalizar
 
 
 ;Método que olhará os valores em screne_up e screen_down e os desenhará na matriz de led
 Desenhar:
+
+  ;out PORTC, screen_down
+
+
   ; Pegar a primeira linha, 4 bits menos significativos de screen_up
   ; Para isso, colocamos esses 4 bits nas suas devidas posições em aux, as 4 mais significativas. Para isso, utilizamos swap para trocar estes bits
   mov   aux, screen_up
@@ -351,7 +369,7 @@ Desenhar:
   ret
 
 
-; Animacao para indicar o fim e volta para o comeco (apertar botao)
+; Animacao para finalizar e voltar para o comeco de um novo nivel
 Finalizar:
   ; Z aponta para tabela espiral
   ldi ZH, high(EspiralTable*2)
@@ -393,7 +411,7 @@ Finalizar_Set_Up:
 
 Finalizar_Desenha:
   rcall Desenhar
-  rcall Atraso
+  rcall Atraso_Pequeno
 
   dec count
   brne Espiral_Loop
@@ -414,6 +432,7 @@ Finalizar_Piscar:
   dec count
   brne Finalizar_Piscar
 
+  sei
   rjmp Aguardar_Botao
 
 
@@ -422,7 +441,7 @@ Atraso:
   Volta1:
   ldi   r21, 0x10
   Volta2:
-  rcall Desenhar
+  ;rcall Desenhar
   dec   r21
   brne  Volta2
   dec   r20
@@ -430,7 +449,7 @@ Atraso:
   ret
 
 Atraso_Pequeno:
-  ldi   r22, 0x5
+  ldi   r22, 0xff
   Volta_Pequena:
   dec   r21
   brne  Volta_Pequena

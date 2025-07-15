@@ -169,20 +169,29 @@ BOTAO_APERTADO:
   BOTAO_APERTADO_Retorno:
   RETI
 
+
 Acender_Up:
+; Essa função considera que o valor de count contém o índice do botão apertado
+; Considere a grid indexada da direita para esquerda, de cima para baixo
   clr   aux
   clr   aux_bit
   inc   aux_bit
 
   Acender_Up_Centro:
+  ; Quando um botão é apertado, nós vamos sempre ascender/apagar ele
+  ; Pra isso, fazemos aux_bit=1<<count para usarmos o aux_bit como máscara
   cp    aux, count
   breq  Acender_Up_Cima
   inc   aux
   lsl   aux_bit
   rjmp  Acender_Up_Centro
   Acender_Up_Cima:
+  ; Utilizamos eor (xor) para aplicarmos a máscara no valor de screen_up
   eor   screen_up, aux_bit
 
+  ; Comparamos agora o valor de count com 4, 
+  ; Se for maior ou igual, faremos aux_bit>>=4 para mudar a máscara para a linha acima
+  ; se for menor, não existe luz acima e partimos para a direita
   cpi   aux, 4
   brlt  Acender_Up_Direita
   mov   bit_copy, aux_bit
@@ -190,9 +199,11 @@ Acender_Up:
   lsr   bit_copy  
   lsr   bit_copy  
   lsr   bit_copy
-  eor   screen_up, bit_copy  
+  eor   screen_up, bit_copy  ; Aplicação da máscara
 
   Acender_Up_Direita:
+  ; Aqui precisamos checar se count é múltiplo de 4 
+  ; usamos o fato de que se isso for verdade, então os 2 bits menos significativos serão 0
   andi  aux, 0b11
   cpi   aux, 0
   breq  Acender_Up_Baixo
@@ -201,6 +212,9 @@ Acender_Up:
   eor   screen_up, bit_copy
 
   Acender_Up_Baixo:
+  ; Precisamos checar se o valor modificado será em scree_up ou screen_down
+  ; Para isso comparamos se o valor é maior ou igual a 4
+  ; A única diferença está na direção dos bot shiftings e em qual registrador será aplciado a máscara
   mov   aux, count
   cpi   aux, 0b100
   brge  Acender_Up_Baixo_Down
@@ -220,6 +234,8 @@ Acender_Up:
   eor   screen_down, bit_copy 
 
   Acender_Up_Esquerda:
+  ; Aqui precisamos checar se count é múltiplo de 4  -1
+  ; usamos o fato de que se isso for verdade, então os 2 bits menos significativos serão 1
   andi  aux, 0b11
   cpi   aux, 0b11
   breq  Acender_Up_Fim

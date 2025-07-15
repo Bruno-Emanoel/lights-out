@@ -6,7 +6,7 @@
 
 <item itemtype="ResistorDip" CircId="ResistorDip-5" mainComp="false" ShowProp="Resistance" Show_id="false" Show_Val="true" Pos="-140,-4" rotation="0" hflip="1" vflip="1" label="ResistorDip-5" idLabPos="-24,-40" labelrot="0" valLabPos="4,-26" valLabRot="90" Resistance="1e-12 Ω" Size="8" PullUp="false" PuVolt="5 V" />
 
-<item itemtype="KeyPad" CircId="KeyPad-6" mainComp="false" Show_id="false" Show_Val="false" Pos="-236,-108" rotation="0" hflip="1" vflip="1" label="KeyPad-6" idLabPos="-8,-16" labelrot="0" valLabPos="-16,20" valLabRot="0" Rows="4" Cols="4" />
+<item itemtype="KeyPad" CircId="KeyPad-6" mainComp="false" Show_id="false" Show_Val="false" Pos="-236,-108" rotation="0" hflip="1" vflip="1" label="KeyPad-6" idLabPos="-8,-16" labelrot="0" valLabPos="-16,20" valLabRot="0" Rows="4" Cols="4" Key_Labels="123456789*0#" />
 
 <item itemtype="ResistorDip" CircId="ResistorDip-7" mainComp="false" ShowProp="Resistance" Show_id="false" Show_Val="true" Pos="16,-104" rotation="0" hflip="1" vflip="1" label="ResistorDip-7" idLabPos="-24,-40" labelrot="0" valLabPos="4,-26" valLabRot="90" Resistance="1 pΩ" Size="8" PullUp="false" PuVolt="5 V" />
 

@@ -34,11 +34,6 @@ INICIO:
   ; Habilitando PCI para o portB (PCIE0)
   ldi   aux, (1<<PCIE0)
   sts   PCICR, aux
-
-
-  ;ldi   aux, 0xff
-  ;out   DDRC, aux
-
   
   ; Como será utilizada uma matriz de led como se fosse 4X4, precisaremos de 16 bits no total.
   ; Ou seja, 2 registradores que serão chamados de screen_up e screen_down, que portarão a parte superior e inferior da tela, respectivamente.
@@ -308,30 +303,18 @@ Acender_Down:
 
 Main:
   ; Desenha na matriz LED
-  ;rcall Atraso
   ; Verifica se o jogo está finalizado
-  ; TODO: Fazer funcionar ????
-  ;cpi screen_up, 0
-  ;brne Main          ; se forem diferentes, continua
-  ;cpi screen_down, 0
-  ;brne Main          ; se não for zero, continua
-  ;rjmp Finalizar
-  
   rcall Desenhar
-  rcall Atraso_Pequeno
   cp screen_up, screen_down
   brne Main
   cpi screen_up, 0x00
   brne Main
+  sei
   rjmp Finalizar
 
 
 ;Método que olhará os valores em screne_up e screen_down e os desenhará na matriz de led
 Desenhar:
-
-  ;out PORTC, screen_down
-
-
   ; Pegar a primeira linha, 4 bits menos significativos de screen_up
   ; Para isso, colocamos esses 4 bits nas suas devidas posições em aux, as 4 mais significativas. Para isso, utilizamos swap para trocar estes bits
   mov   aux, screen_up
@@ -426,9 +409,13 @@ Finalizar_Set_Up:
     or screen_up, aux_bit
 
 Finalizar_Desenha:
+  ldi aux, 0xFF
+  mov aux_timer, aux
+  Desenha_Loop:
   rcall Desenhar
-  rcall Atraso_Pequeno
-
+  dec aux_timer
+  brne Desenha_Loop
+  
   dec count
   brne Espiral_Loop
 
@@ -437,13 +424,11 @@ Finalizar_Desenha:
 Finalizar_Piscar:
   ldi screen_up, 0xFF
   ldi screen_down, 0xFF
-  rcall Desenhar
-  rcall Atraso
+  rcall Piscar_Loop
 
   clr screen_up
   clr screen_down
-  rcall Desenhar
-  rcall Atraso
+  rcall Piscar_Loop
 
   dec count
   brne Finalizar_Piscar
@@ -451,13 +436,27 @@ Finalizar_Piscar:
   sei
   rjmp Aguardar_Botao
 
+; Permanece os LED's ligados por um tempo
+Piscar_Loop:
+  ldi r20, 8
+  Loop1:
+  ldi r21, 0xFF
+  mov aux_timer, r21
+  Loop2:
+  rcall Desenhar
+  dec aux_timer
+  brne Loop2
+  dec r20
+  brne Loop1
+  
+  ret
+
 
 Atraso:
   ldi   r20, 0xff
   Volta1:
   ldi   r21, 0x10
   Volta2:
-  ;rcall Desenhar
   dec   r21
   brne  Volta2
   dec   r20

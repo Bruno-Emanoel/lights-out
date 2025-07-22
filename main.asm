@@ -10,42 +10,41 @@
 .def aux_bit = R22
 .def bit_copy = R23
 .def row_pointer = R24
-.def col_pointer = R25
-.equ Botoes = PINB
+.def Botao_keep = R25
+.equ Botoes_col = PINB
+.equ Botoes_lin = PORTC
 
 .ORG 0x00
   RJMP INICIO 
 .org PCI0addr
   RJMP BOTAO_APERTADO
-.org PCI1addr   
-  RJMP BOTAO_APERTADO
 
 
+; Devemos inicializar o programa com as devidas configurações de porta
+; Serão usados todos os pinos da porta D como saída (para o display)
+; Será usados PB0~PB3 e PC0~PC3 para os botões, de maneira que:
+; PCs serão usados para alimentação
+; PBs serão usados para leitura em pull-down, ativando interrupção quando pressionados
 INICIO:
   ; Usaremos PD0 ~ PD7 como saída
   ldi   aux, 0xff
   out   DDRD, aux
-  ; Usaremos PB0 ~ PB5 como entrada
-  ldi   aux, 0b00000
+  ; Usaremos PB0 ~ PB3 como entrada
+  ldi   aux, 0b0000
   out   DDRB, aux
-  ; Usaremos PC0 ~ PC1 como entrada
-  ldi   aux, 0b00
-  out   DDRC, aux
-
-  ; Pull-up habilitado 
-  ldi   aux, 0b00111111
+  ; Pull-up desabilitado Para os pins de B configurados
   out   PORTB, aux
-  ; Define todos os Pins B como ativadores de interrupção
-  sts   PCMSK0, aux
 
-  ; Pull-up habilitado 
-  ldi   aux, 0b00000011
+  ; Usaremos PC0 ~ PC3 como saída
+  ldi   aux, 0b1111
+  out   DDRC, aux
   out   PORTC, aux
-  ; Habilita PCI para PC0-PC1 (PCINT8-9)
-  sts   PCMSK1, aux
-  
+
+  ; Define PB0 ~ PB3 como ativadores de interrupção
+  sts   PCMSK0, aux
+ 
   ; Habilitando PCI para o portB (PCIE0)
-  ldi   aux, (1<<PCIE0)|(1<<PCIE1)
+  ldi   aux, (1<<PCIE0)
   sts   PCICR, aux
   
   ; Como será utilizada uma matriz de led como se fosse 4X4, precisaremos de 16 bits no total.
@@ -61,15 +60,10 @@ INICIO:
 
   ; Aguardar botão ser pressionado
   Aguardar_Botao:
-    in aux, PINB       
-    andi aux, 0b111111  
-    cpi aux, 0x00       
-    brne Aguardar_Botao_Fim
-    in aux, PINC
-    andi aux, 0b11
-    cpi   aux, 0
-    breq  Aguardar_Botao
-  Aguardar_Botao_Fim:  
+    in aux, Botoes_col       
+    andi aux, 0b1111  
+    cpi aux, 0    
+    breq Aguardar_Botao
 
   rcall Gerar_Padrao_Possivel
 
@@ -135,93 +129,76 @@ Simular_Down:
   ret
 
 
+; Função de tratamento de interrupção
+; Assim que um botão for apertado, receberemos uma interrupção em PORTB
+; A lógica consiste em conseguir o índice do botão apertado, da direita para esquerda de cima para baixo; (0-indexado)
+; Para isso, faremos scanning nos botões, mudando os valores em PORTC
 BOTAO_APERTADO:
-  ; Quando o botão é apertado, ele muda arbitrariamente os valores em screen_up e screen_down
-  in aux, SREG
-  push aux
+  ; Devemos guarda o valor anteriormente em SREG para não afetar a execução do programa
+  push  aux
+  in    aux, SREG
+  push  aux
 
-  in    aux, PINB
-  andi  aux, 0b110000
-  cpi   aux, 0
-  brne  BOTAO_APERTADO_Continue
-  in    aux, PINC
-  andi  aux, 0b11
-  cpi   aux, 0
-  brne  BOTAO_APERTADO_Continue
-  rcall Atraso_Pequeno_ex
-  BOTAO_APERTADO_Continue:
+  ; Guardaremos o valor lido por PORTB, ou seja, a coluna que foi pressionada
+  in    Botao_keep, Botoes_col
+  andi  Botao_keep, 0b1111      ; Remove bits não importantes para a leitura (4 mais significativos)
+  cpi   Botao_keep, 0           ; Se não foi identificado nenhum botão apertado, retornamos
+  breq  BOTAO_APERTADO_Retorno
+  clr   aux
+  out   Botoes_lin, aux         ; Temos que cessar a alimentação dos botões para checar a linha pressionada
+  clr   count                   ; Usaremos count para indexar o botão apertado, contando da direita para esquerda, de cima pra baixo
+  ldi   row_pointer, 1          ; Máscara de bits para checar a linha
 
-  cpi   R28, 0
-  brne  BOTAO_APERTADO_Retorno
-  clr   count
-  ldi   col_pointer, 1
-  ldi   row_pointer, 0b10000
-
-  BOTAO_APERTADO_Checar:
-  in    aux, Botoes
-  and   aux, row_pointer
-  cpi   aux, 0
-  breq  BOTAO_APERTADO_Checar_ProximaLinha
-  rjmp  BOTAO_APERTADO_Coluna
-  BOTAO_APERTADO_Checar_ProximaLinha:
-  ldi   aux, 4
-  add   count, aux
-  lsl   row_pointer
-  cpi   count, 8
-  brge  BOTAO_APERTADO_Linha1
-  rjmp  BOTAO_APERTADO_Checar
-
-  BOTAO_APERTADO_Linha1:
-  ldi   row_pointer, 1
   BOTAO_APERTADO_Linha:
-  in    aux, PINC
-  and   aux, row_pointer
-  cpi   aux, 0
-  breq  BOTAO_APERTADO_Linha_ProximaLinha
-  rjmp  BOTAO_APERTADO_Coluna
-  BOTAO_APERTADO_Linha_ProximaLinha:
-  ldi   aux, 4
-  add   count, aux
-  lsl   row_pointer
+  out   Botoes_lin, row_pointer ; Colocamos a máscara na Saída C, para testar para uma linha específica
+  ; Tempo de debounce
+  rcall Atraso_Pequeno          ; Debounce
+  in    aux, Botoes_col         ; Pegamos novamente o valor de entrada.
+  andi  aux, 0b1111
+  cp    aux, Botao_keep         ; Se ele permanece igual, achamos a linha
+  breq  BOTAO_APERTADO_Coluna
+  BOTAO_APERTADO_Linha_Prox:    ; Se não, checamos a próxima
+  subi  count, -4               ; count += 4 (pula linha)
   cpi   count, 16
-  brge  BOTAO_APERTADO_Retorno
+  brge  BOTAO_APERTADO_Retorno  ; Checa se não passou do índice limite
+  lsl   row_pointer             ; row_pointer<<1 (muda a máscara para o próximo bit)
   rjmp  BOTAO_APERTADO_Linha
 
   BOTAO_APERTADO_Coluna:
-  in    aux, Botoes
-  and   aux, col_pointer
-  cpi   aux, 0
-  breq  BOTAO_APERTADO_Checar_ProximaColuna
-  rjmp  BOTAO_APERTADO_Acender
-  BOTAO_APERTADO_Checar_ProximaColuna:
-  inc   count
-  lsl   col_pointer
+  lsr   Botao_keep              ; Enquanto não chegarmos no bit de coluna que foi acendido
+  cpi   Botao_keep, 0           ; Se Botao_keep===0, chegamos no índice desejado
+  breq  BOTAO_APERTADO_Coluna_End
+  inc   count                   ; count++
   cpi   count, 16
   brge  BOTAO_APERTADO_Retorno
   rjmp  BOTAO_APERTADO_Coluna
 
 
+  BOTAO_APERTADO_Coluna_End:
   cpi   count, 16
   brge  BOTAO_APERTADO_Retorno
+
   BOTAO_APERTADO_Acender:
   mov   R26, count
-  cpi   count, 8
+  cpi   count, 8              ; Devemos checar se a mudança será feita em screen_up ou screen_down primariamente
   brge  BOTAO_APERTADO_Down
-  rcall Acender_Up
-  rjmp  BOTAO_APERTADO_Retorno
+  rcall Acender_Up            ; Mudança será feita em screen_up
+  rjmp  BOTAO_APERTADO_Retorno; Fim
   BOTAO_APERTADO_Down:
-  subi  count, 8
-  rcall Acender_Down
-  inc   r28
+  subi  count, 8              ; Mudamos o índice relativo
+  rcall Acender_Down          ; Mudança será feita em screen_down
   BOTAO_APERTADO_Retorno:
-  pop  aux
-  out SREG, aux
+  pop   aux
+  out   SREG, aux
+  ldi   aux, 0b1111
+  out   Botoes_lin, aux
+  pop   aux
   RETI
 
 
-Acender_Up:
 ; Essa função considera que o valor de count contém o índice do botão apertado
 ; Considere a grid indexada da direita para esquerda, de cima para baixo
+Acender_Up:
   clr   aux
   clr   aux_bit
   inc   aux_bit
@@ -235,8 +212,7 @@ Acender_Up:
   lsl   aux_bit
   rjmp  Acender_Up_Centro
   Acender_Up_Cima:
-  ; Utilizamos eor (xor) para aplicarmos a máscara no valor de screen_up
-  eor   screen_up, aux_bit
+  eor   screen_up, aux_bit  ; Aplicamos a máscara com o xor, mudando o estado do bit referente ao botão apertado
 
   ; Comparamos agora o valor de count com 4, 
   ; Se for maior ou igual, faremos aux_bit>>=4 para mudar a máscara para a linha acima
@@ -263,7 +239,7 @@ Acender_Up:
   Acender_Up_Baixo:
   ; Precisamos checar se o valor modificado será em scree_up ou screen_down
   ; Para isso comparamos se o valor é maior ou igual a 4
-  ; A única diferença está na direção dos bot shiftings e em qual registrador será aplciado a máscara
+  ; A única diferença está na direção dos bit shiftings e em qual registrador será aplciado a máscara
   mov   aux, count
   cpi   aux, 0b100
   brge  Acender_Up_Baixo_Down
@@ -294,20 +270,27 @@ Acender_Up:
   Acender_Up_Fim:
   ret
 
+; Essa função considera que o valor de count contém o índice do botão apertado
+; Considere a grid indexada da direita para esquerda, de cima para baixo
 Acender_Down:
   clr   aux
   clr   aux_bit
   inc   aux_bit
   
   Acender_Down_Centro:
+  ; Quando um botão é apertado, nós vamos sempre ascender/apagar ele
+  ; Pra isso, fazemos aux_bit=1<<count para usarmos o aux_bit como máscara
   cp    aux, count
   breq  Acender_Down_Cima
   inc   aux
   lsl   aux_bit
   rjmp  Acender_Down_Centro
   Acender_Down_Cima:
-  eor   screen_down, aux_bit
+  eor   screen_down, aux_bit ; Aplicamos a máscara com o xor, mudando o estado do bit referente ao botão apertado
 
+  ; Comparamos agora o valor de count com 4, 
+  ; Se for menor, faremos aux_bit>>=4 para mudar a máscara para a linha acima
+  ; se for maior ou igual, a mudança será feita em screen_up
   cpi   aux, 4
   brlt  Acender_Down_Cima_Up
   mov   bit_copy, aux_bit
@@ -326,6 +309,8 @@ Acender_Down:
   eor   screen_up, bit_copy
 
   Acender_Down_Direita:
+  ; Aqui precisamos checar se count é múltiplo de 4 
+  ; usamos o fato de que se isso for verdade, então os 2 bits menos significativos serão 0
   andi  aux, 0b11
   cpi   aux, 0
   breq  Acender_Down_Baixo
@@ -334,8 +319,12 @@ Acender_Down:
   eor   screen_down, bit_copy
 
   Acender_Down_Baixo:
+  ; Precisamos checar se o valor modificado será em scree_up ou screen_down
+  ; Para isso comparamos se o valor é maior ou igual a 4
+  ; Se for verdade, então não haverá luz embaixo
+  ; Caso contrário, faremos bit_copy<<=4 e aplicamos a máscara
   mov   aux, count
-  cpi   aux, 0b100
+  cpi   aux, 4
   brge  Acender_Down_Esquerda
   mov   bit_copy, aux_bit
   lsl   bit_copy
@@ -345,6 +334,8 @@ Acender_Down:
   eor   screen_down, bit_copy
 
   Acender_Down_Esquerda:
+  ; Aqui precisamos checar se count é múltiplo de 4  -1
+  ; usamos o fato de que se isso for verdade, então os 2 bits menos significativos serão 1
   andi  aux, 0b11
   cpi   aux, 0b11
   breq  Acender_Down_Fim
@@ -419,7 +410,6 @@ Desenhar:
   out   PORTD, aux
   rcall Atraso_Pequeno
 
-  clr   r28
   ret
 
 
@@ -524,15 +514,6 @@ Atraso_Pequeno:
   dec   r21
   brne  Volta_Pequena
   ret
-
-Atraso_Pequeno_ex:
-  ldi   r27, 0xff
-  Volta_Pequenaex:
-  dec   r27
-  cpi   r27, 0
-  brne  Volta_Pequenaex
-  ret
-
 
 EspiralTable:
   .db 0, 1, 2, 3

@@ -17,22 +17,35 @@
   RJMP INICIO 
 .org PCI0addr
   RJMP BOTAO_APERTADO
+.org PCI1addr   
+  RJMP BOTAO_APERTADO
 
 
 INICIO:
   ; Usaremos PD0 ~ PD7 como saída
   ldi   aux, 0xff
   out   DDRD, aux
-  ; Usaremos PB0 ~ PB7 como entrada
-  ldi   aux, 0
+  ; Usaremos PB0 ~ PB5 como entrada
+  ldi   aux, 0b00000
   out   DDRB, aux
+  ; Usaremos PC0 ~ PC1 como entrada
+  ldi   aux, 0b00
+  out   DDRC, aux
+
   ; Pull-up habilitado 
-  ldi   aux, 0xff
+  ldi   aux, 0b00111111
   out   PORTB, aux
   ; Define todos os Pins B como ativadores de interrupção
   sts   PCMSK0, aux
+
+  ; Pull-up habilitado 
+  ldi   aux, 0b00000011
+  out   PORTC, aux
+  ; Habilita PCI para PC0-PC1 (PCINT8-9)
+  sts   PCMSK1, aux
+  
   ; Habilitando PCI para o portB (PCIE0)
-  ldi   aux, (1<<PCIE0)
+  ldi   aux, (1<<PCIE0)|(1<<PCIE1)
   sts   PCICR, aux
   
   ; Como será utilizada uma matriz de led como se fosse 4X4, precisaremos de 16 bits no total.
@@ -48,9 +61,15 @@ INICIO:
 
   ; Aguardar botão ser pressionado
   Aguardar_Botao:
-    in aux, PINB         
+    in aux, PINB       
+    andi aux, 0b111111  
     cpi aux, 0x00       
-    breq Aguardar_Botao
+    brne Aguardar_Botao_Fim
+    in aux, PINC
+    andi aux, 0b11
+    cpi   aux, 0
+    breq  Aguardar_Botao
+  Aguardar_Botao_Fim:  
 
   rcall Gerar_Padrao_Possivel
 
@@ -118,6 +137,22 @@ Simular_Down:
 
 BOTAO_APERTADO:
   ; Quando o botão é apertado, ele muda arbitrariamente os valores em screen_up e screen_down
+  in aux, SREG
+  push aux
+
+  in    aux, PINB
+  andi  aux, 0b110000
+  cpi   aux, 0
+  brne  BOTAO_APERTADO_Continue
+  in    aux, PINC
+  andi  aux, 0b11
+  cpi   aux, 0
+  brne  BOTAO_APERTADO_Continue
+  rcall Atraso_Pequeno_ex
+  BOTAO_APERTADO_Continue:
+
+  cpi   R28, 0
+  brne  BOTAO_APERTADO_Retorno
   clr   count
   ldi   col_pointer, 1
   ldi   row_pointer, 0b10000
@@ -132,9 +167,25 @@ BOTAO_APERTADO:
   ldi   aux, 4
   add   count, aux
   lsl   row_pointer
+  cpi   count, 8
+  brge  BOTAO_APERTADO_Linha1
+  rjmp  BOTAO_APERTADO_Checar
+
+  BOTAO_APERTADO_Linha1:
+  ldi   row_pointer, 1
+  BOTAO_APERTADO_Linha:
+  in    aux, PINC
+  and   aux, row_pointer
+  cpi   aux, 0
+  breq  BOTAO_APERTADO_Linha_ProximaLinha
+  rjmp  BOTAO_APERTADO_Coluna
+  BOTAO_APERTADO_Linha_ProximaLinha:
+  ldi   aux, 4
+  add   count, aux
+  lsl   row_pointer
   cpi   count, 16
   brge  BOTAO_APERTADO_Retorno
-  rjmp  BOTAO_APERTADO_Checar
+  rjmp  BOTAO_APERTADO_Linha
 
   BOTAO_APERTADO_Coluna:
   in    aux, Botoes
@@ -161,7 +212,10 @@ BOTAO_APERTADO:
   BOTAO_APERTADO_Down:
   subi  count, 8
   rcall Acender_Down
+  inc   r28
   BOTAO_APERTADO_Retorno:
+  pop  aux
+  out SREG, aux
   RETI
 
 
@@ -365,11 +419,13 @@ Desenhar:
   out   PORTD, aux
   rcall Atraso_Pequeno
 
+  clr   r28
   ret
 
 
 ; Animacao para finalizar e voltar para o comeco de um novo nivel
 Finalizar:
+  cli
   ; Z aponta para tabela espiral
   ldi ZH, high(EspiralTable*2)
   ldi ZL, low(EspiralTable*2)
@@ -433,7 +489,6 @@ Finalizar_Piscar:
   dec count
   brne Finalizar_Piscar
 
-  sei
   rjmp Aguardar_Botao
 
 ; Permanece os LED's ligados por um tempo
@@ -464,10 +519,18 @@ Atraso:
   ret
 
 Atraso_Pequeno:
-  ldi   r22, 0xff
+  ldi   r21, 0xff
   Volta_Pequena:
   dec   r21
   brne  Volta_Pequena
+  ret
+
+Atraso_Pequeno_ex:
+  ldi   r27, 0xff
+  Volta_Pequenaex:
+  dec   r27
+  cpi   r27, 0
+  brne  Volta_Pequenaex
   ret
 
 

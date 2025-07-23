@@ -57,16 +57,6 @@ Com as celúlas que vão ser alteradas identificadas a função main chama o mé
 
 
 
-
-
-
-
-
-
-
-
-
-
 ## Materiais Utilizados
 1 × Arduino UNO (com ATMEGA328-PB)
 
@@ -75,6 +65,7 @@ Com as celúlas que vão ser alteradas identificadas a função main chama o mé
 1 × Matriz de led 8x8
 
 × Resistores de 330 Ω (para os LEDs) e de 100 Ω (para os botões)
+
 × Jumpers
 
 1 × Protoboard

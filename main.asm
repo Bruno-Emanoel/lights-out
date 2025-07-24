@@ -32,13 +32,16 @@ INICIO:
   ; Usaremos PB0 ~ PB3 como entrada
   ldi   aux, 0b0000
   out   DDRB, aux
-  ; Pull-up desabilitado Para os pins de B configurados
+  ; Pull-up habilitado Para os pins de B configurados
+  ldi   aux, 0b1111
   out   PORTB, aux
 
   ; Usaremos PC0 ~ PC3 como saída
-  ldi   aux, 0b1111
+  
   out   DDRC, aux
-  out   PORTC, aux
+  ldi   aux, 0 
+  out   PORTC, aux ; coloca as linhas em LOW
+  ldi   aux, 0b1111 ; 
 
   ; Define PB0 ~ PB3 como ativadores de interrupção
   sts   PCMSK0, aux
@@ -141,6 +144,7 @@ BOTAO_APERTADO:
 
   ; Guardaremos o valor lido por PORTB, ou seja, a coluna que foi pressionada
   in    Botao_keep, Botoes_col
+  com   Botao_keep              ; Inverte pois estamos usando pull-up (0 = pressionado)
   andi  Botao_keep, 0b1111      ; Remove bits não importantes para a leitura (4 mais significativos)
   cpi   Botao_keep, 0           ; Se não foi identificado nenhum botão apertado, retornamos
   breq  BOTAO_APERTADO_Retorno
@@ -148,12 +152,13 @@ BOTAO_APERTADO:
   out   Botoes_lin, aux         ; Temos que cessar a alimentação dos botões para checar a linha pressionada
   clr   count                   ; Usaremos count para indexar o botão apertado, contando da direita para esquerda, de cima pra baixo
   ldi   row_pointer, 1          ; Máscara de bits para checar a linha
-
+  com   row_pointer
   BOTAO_APERTADO_Linha:
   out   Botoes_lin, row_pointer ; Colocamos a máscara na Saída C, para testar para uma linha específica
   ; Tempo de debounce
   rcall Atraso_Pequeno          ; Debounce
   in    aux, Botoes_col         ; Pegamos novamente o valor de entrada.
+  com   aux                     ; Inverte pois estamos usando pull-up
   andi  aux, 0b1111
   cp    aux, Botao_keep         ; Se ele permanece igual, achamos a linha
   breq  BOTAO_APERTADO_Coluna
@@ -161,7 +166,9 @@ BOTAO_APERTADO:
   subi  count, -4               ; count += 4 (pula linha)
   cpi   count, 16
   brge  BOTAO_APERTADO_Retorno  ; Checa se não passou do índice limite
+  com row_pointer
   lsl   row_pointer             ; row_pointer<<1 (muda a máscara para o próximo bit)
+  com   row_pointer
   rjmp  BOTAO_APERTADO_Linha
 
   BOTAO_APERTADO_Coluna:
@@ -172,7 +179,6 @@ BOTAO_APERTADO:
   cpi   count, 16
   brge  BOTAO_APERTADO_Retorno
   rjmp  BOTAO_APERTADO_Coluna
-
 
   BOTAO_APERTADO_Coluna_End:
   cpi   count, 16
@@ -190,7 +196,7 @@ BOTAO_APERTADO:
   BOTAO_APERTADO_Retorno:
   pop   aux
   out   SREG, aux
-  ldi   aux, 0b1111
+  ldi   aux, 0
   out   Botoes_lin, aux
   pop   aux
   RETI

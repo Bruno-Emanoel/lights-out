@@ -14,25 +14,26 @@ Além disso, as quatro luzes vizinhas (cima, baixo, esquerda, direita) também t
 
 As diagonais não são afetadas.
 
-#
+
 
 
 ## Em relação ao Código
 
-#### Rotina de Interrupção
-Foi implementada uma rotina de interrupção no código(BOTAO_APERTADO) com o objetivo de verificar se um botão foi pressionado.
-Sempre que ocorre uma mudança no pino configurado (uma borda de subida), 
-a interrupção é acionada automaticamente, desviando o fluxo do programa principal para a rotina de tratamento.
+### Rotina de Interrupção para os botões
+O código utiliza interrupção por mudança de pino (Pin Change Interrupt) nos pinos PB0 a PB3, configurados como entradas com pull-down. Esses pinos fazem parte do grupo PCINT0, e são ativados pelo registrador PCMSK0, que define quais pinos devem gerar interrupção ao mudar de estado. A interrupção do grupo é habilitada pelo registrador PCICR, e o vetor de interrupção é definido com .org PCI0addr. Assim, quando um botão é pressionado e o nível lógico muda, a rotina BOTAO_APERTADO é chamada automaticamente.
+
+### Timers
+
+No código, os timers 0 e 1 do microcontrolador são utilizados como fontes de valores pseudoaleatórios para simular toques no teclado matricial. Seus registradores (TCNT0 e TCNT1L) são lidos e manipulados (com soma, inversão e XOR), gerando números entre 0 e 15, que representam as 16 posições possíveis do teclado. Esses valores alimentam a sub-rotina que acende os “botões” correspondentes, criando padrões simulados de toques aleatórios.
 
 
-#### Tratamento dos botões
+### Tratamento dos botões
 
-O teclado de membrana 4x4 é tratado no código por meio de uma técnica de multiplexação, que permite identificar qual tecla foi pressionada utilizando um número reduzido de pinos do microcontrolador. 
+O teclado de membrana 4x4 é tratado no código por meio de uma função que permite identificar qual tecla foi pressionada utilizando um número reduzido de pinos do microcontrolador. 
 Esse teclado possui 4 linhas e 4 colunas permitindo 16 botões.
 
-No funcionamento, colunas são declaradas como saída recebendo sinal "1" ( nível lógico alto) e as linhas recebem sinal "0" (colocadas em nível lógico baixo). 
-Quando uma tecla é pressionada, ela conecta uma linha a uma coluna, fazendo assim com que a coluna vá para o nível lógico baixo, assim é salvo qual coluna foi pressionada 
-e logo após é invertido o sinal lógico das linhas e colunas com isso chama-se uma outra rotina para detectar qual linha foi pressionada(verificar qual linha está em "0", assim detectando 
+No funcionamento, linhas são declaradas como saída recebendo sinal "1" ( nível lógico alto) e as colunas estão em pulldown recebem sinal "0" (colocadas em nível lógico baixo). 
+Quando uma tecla é pressionada, ela conecta uma linha a uma coluna, fazendo assim com que a coluna vá para o nível lógico alto, assim é salvo qual coluna foi pressionada com isso chama-se uma outra rotina de escaneamento para detectar qual linha foi pressionada assim verificando
 qual botão foi pressionado através de qual coluna e linha.
 
 Essa varredura ocorre de forma sequencial e rápida, 
@@ -49,8 +50,9 @@ O uso de máscaras binárias permite alterar os bits individualmente com eficiê
 Com as celúlas que vão ser alteradas identificadas a função main chama o método desenha para passar os valores para as saídas acendendo e apagando as células necessárias e também verifica se todos os LEDs foram apagados, sinalizando a vitória do jogador.
 
 
+## Desenho do circuito 
 
-
+<img width="698" height="351" alt="image" src="https://github.com/user-attachments/assets/4fbadb6b-ddfa-4b7a-8d99-c9ad575adfcd" />
 
 
 
@@ -69,3 +71,12 @@ Com as celúlas que vão ser alteradas identificadas a função main chama o mé
 × Jumpers
 
 1 × Protoboard
+
+### Equipe
+Bruno Emanoel
+
+Gabriel Marcos 
+
+Marcello Lima
+
+Pedro Antônio
